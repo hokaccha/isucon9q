@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+def ids
+  json = `envchain aws-personal terraform show -json`
+  json['values']['root_module']['resources'].filter do |resource|
+    resource['name'] == 'isucon'
+  end.map do |resource|
+    resource['values']['id']
+  end.join(',')
+end
+
+case ARGV[0]
+when 'show'
+  system 'envchain', 'aws-personal', 'aws', 'ec2', 'describe-instance-status', '--include-all-instances', '--instance-ids', ids
+when 'start'
+  system 'envchain', 'aws-personal', 'aws', 'ec2', 'start-instances', '--instance-ids', ids
+when 'stop'
+  system 'envchain', 'aws-personal', 'aws', 'ec2', 'stop-instances', '--instance-ids', ids
+else
+  warn "Usage: bin/ec2 [show|start|stop]"
+  exit 1
+end
