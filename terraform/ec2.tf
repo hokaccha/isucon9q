@@ -20,7 +20,7 @@ resource "aws_instance" "isucon" {
   ami = data.aws_ami.ubuntu.id
   # instance_type = "t3.medium"
   instance_type = "t3.nano"
-  key_name      = "hokamura"
+  key_name      = "isucon"
 
   vpc_security_group_ids = [aws_security_group.default.id]
 
