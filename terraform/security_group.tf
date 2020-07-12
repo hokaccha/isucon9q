@@ -9,6 +9,13 @@ resource "aws_security_group" "default" {
   }
 
   ingress {
+    protocol  = -1
+    self      = true
+    from_port = 0
+    to_port   = 0
+  }
+
+  ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -18,22 +25,6 @@ resource "aws_security_group" "default" {
   ingress {
     from_port   = 443
     to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # mysql
-  ingress {
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # redis
-  ingress {
-    from_port   = 6379
-    to_port     = 6379
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
