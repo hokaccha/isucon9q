@@ -6,6 +6,7 @@ require 'mysql2'
 require 'mysql2-cs-bind'
 require 'bcrypt'
 require 'isucari/api'
+require_relative './category'
 
 module Isucari
   class Web < Sinatra::Base
@@ -92,7 +93,8 @@ module Isucari
       end
 
       def get_category_by_id(category_id)
-        category = db.xquery('SELECT * FROM `categories` WHERE `id` = ?', category_id).first
+        # category = db.xquery('SELECT * FROM `categories` WHERE `id` = ?', category_id).first
+        category = Category.find(category_id.to_i)
 
         return if category.nil?
 
