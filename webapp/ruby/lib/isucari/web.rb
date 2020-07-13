@@ -1,3 +1,4 @@
+require 'newrelic_rpm'
 require 'json'
 require 'securerandom'
 require 'sinatra/base'
@@ -1195,7 +1196,7 @@ module Isucari
     # getReports
     get '/reports.json' do
       transaction_evidences = db.xquery('SELECT * FROM `transaction_evidences` WHERE `id` > 15007')
-      
+
       response = transaction_evidences.map do |transaction_evidence|
         {
           'id' => transaction_evidence['id'],
