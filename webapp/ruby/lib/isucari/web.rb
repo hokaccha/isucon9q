@@ -295,8 +295,18 @@ module Isucari
       else
         # 1st page
         begin
-          db.xquery("SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?, ?, ?, ?, ?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{TRANSACTIONS_PER_PAGE + 1}", user['id'], user['id'], ITEM_STATUS_ON_SALE, ITEM_STATUS_TRADING, ITEM_STATUS_SOLD_OUT, ITEM_STATUS_CANCEL, ITEM_STATUS_STOP)
-        rescue
+          db.xquery("
+            SELECT
+              *
+            FROM (
+              SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN ('on_sale', 'trading', 'sold_out', 'cancel', 'stop')
+              union all
+              SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN ('on_sale', 'trading', 'sold_out', 'cancel', 'stop')
+            ) as t
+            ORDER BY `created_at` DESC, `id` DESC LIMIT 11
+          ", user['id'], user['id'])
+        rescue => err
+          p err
           db.query('ROLLBACK')
           halt_with_error 500, 'db error'
         end
