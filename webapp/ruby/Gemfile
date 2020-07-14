@@ -1,11 +1,13 @@
 source 'https://rubygems.org'
 
 gem 'puma'
-gem 'sinatra'
+gem 'sinatra', git: 'https://github.com/sinatra/sinatra'
 gem 'mysql2'
 gem 'mysql2-cs-bind'
 gem 'bcrypt'
 gem 'newrelic_rpm'
+gem 'rack-lineprof'
+gem 'pry'
 
 group :development do
   gem 'sinatra-contrib'
