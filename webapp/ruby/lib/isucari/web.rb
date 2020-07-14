@@ -7,6 +7,9 @@ require 'mysql2-cs-bind'
 require 'bcrypt'
 require 'isucari/api'
 require_relative './category'
+require_relative './mysql2_query_logger'
+
+Mysql2QueryLogger.enable!(root_dir: __dir__, ignore_fast_query: true) if ENV['ql'] == '1'
 
 module Isucari
   class Web < Sinatra::Base
