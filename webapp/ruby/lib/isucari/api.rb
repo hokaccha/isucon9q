@@ -1,6 +1,7 @@
 require 'json'
 require 'uri'
 require 'net/http'
+require 'typhoeus'
 
 module Isucari
   class API
@@ -89,6 +90,32 @@ module Isucari
       end
 
       JSON.parse(res.body)
+    end
+
+    def shipment_status_parallel(shipment_url, reserve_ids)
+      uri = URI.parse("#{shipment_url}/status")
+      hydra = Typhoeus::Hydra.hydra
+      results = {}
+      reserve_ids.each do |rid|
+        req = Typhoeus::Request.new(uri, {
+          method: :post,
+          headers: {
+            'Content-Type' => 'application/json',
+            'User-Agent' => @user_agent,
+            'Authorization' => ISUCARI_API_TOKEN
+          },
+          body: { reserve_id: rid }.to_json,
+        })
+        req.on_complete do |res|
+          if res.code != 200
+            raise Error, "status code #{res.code}; body #{res.body}"
+          end
+          results[rid] = JSON.parse(res.body)
+        end
+        hydra.queue(req)
+      end
+      hydra.run
+      results
     end
   end
 end

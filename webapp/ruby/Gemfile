@@ -8,6 +8,7 @@ gem 'bcrypt'
 gem 'newrelic_rpm'
 gem 'rack-lineprof'
 gem 'pry'
+gem 'typhoeus'
 
 group :development do
   gem 'sinatra-contrib'

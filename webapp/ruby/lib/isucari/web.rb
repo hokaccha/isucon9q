@@ -95,6 +95,15 @@ module Isucari
         }
       end
 
+      def batch_get_users(ids)
+        return [] if ids.empty?
+        h = {}
+        db.xquery('SELECT id, account_name, num_sell_items FROM `users` WHERE `id` in (?)', ids).each do |u|
+          h[u['id']] = u
+        end
+        h
+      end
+
       def get_category_by_id(category_id)
         # category = db.xquery('SELECT * FROM `categories` WHERE `id` = ?', category_id).first
         category = Category.find(category_id.to_i)
@@ -185,8 +194,10 @@ module Isucari
         db.xquery("SELECT * FROM `items` WHERE `status` IN (?, ?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", ITEM_STATUS_ON_SALE, ITEM_STATUS_SOLD_OUT)
       end
 
+      sellers = batch_get_users(items.map {|i| i['seller_id'] })
+
       item_simples = items.map do |item|
-        seller = get_user_simple_by_id(item['seller_id'])
+        seller = sellers[item['seller_id']]
         halt_with_error 404, 'seller not found' if seller.nil?
 
         category = get_category_by_id(item['category_id'])
@@ -239,8 +250,10 @@ module Isucari
         db.xquery("SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", ITEM_STATUS_ON_SALE, ITEM_STATUS_SOLD_OUT, category_ids)
       end
 
+      sellers = batch_get_users(items.map {|i| i['seller_id'] })
+
       item_simples = items.map do |item|
-        seller = get_user_simple_by_id(item['seller_id'])
+        seller = sellers[item['seller_id']]
         halt_with_error 404, 'seller not found' if seller.nil?
 
         category = get_category_by_id(item['category_id'])
@@ -312,8 +325,31 @@ module Isucari
         end
       end
 
+      sellers = batch_get_users(items.map {|i| i['seller_id'] })
+      buyers = batch_get_users(items.map {|i| i['buyer_id'] })
+
+      transaction_evidences = {}
+      if items.size > 0
+        db.xquery('SELECT * FROM `transaction_evidences` WHERE `item_id` in (?)', items.map{_1['id']}).each do |t|
+          transaction_evidences[t['item_id']] = t
+        end
+      end
+
+      shippings = {}
+      if transaction_evidences.size > 0
+        db.xquery('SELECT * FROM `shippings` WHERE `transaction_evidence_id` in (?)', transaction_evidences.values.map{_1['id']}).each do |s|
+          shippings[s['transaction_evidence_id']] = s
+        end
+      end
+
+      statuses = {}
+      if shippings.size > 0
+        reserve_ids = shippings.values.map{_1['reserve_id']}
+        statuses = api_client.shipment_status_parallel(get_shipment_service_url, reserve_ids)
+      end
+
       item_details = items.map do |item|
-        seller = get_user_simple_by_id(item['seller_id'])
+        seller = sellers[item['seller_id']]
         if seller.nil?
           db.query('ROLLBACK')
           halt_with_error 404, 'seller not found'
@@ -345,7 +381,7 @@ module Isucari
         }
 
         if item['buyer_id'] != 0
-          buyer = get_user_simple_by_id(item['buyer_id'])
+          buyer = buyers[item['buyer_id']]
           if buyer.nil?
             db.query('ROLLBACK')
             halt_with_error 404, 'buyer not found'
@@ -355,24 +391,17 @@ module Isucari
           item_detail['buyer'] = buyer
         end
 
-        transaction_evidence = db.xquery('SELECT * FROM `transaction_evidences` WHERE `item_id` = ?', item['id']).first
+        transaction_evidence = transaction_evidences[item['id']]
         unless transaction_evidence.nil?
-          shipping = db.xquery('SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?', transaction_evidence['id']).first
+          shipping = shippings[transaction_evidence['id']]
           if shipping.nil?
             db.query('ROLLBACK')
             halt_with_error 404, 'shipping not found'
           end
 
-          ssr = begin
-            api_client.shipment_status(get_shipment_service_url, 'reserve_id' => shipping['reserve_id'])
-          rescue
-            db.query('ROLLBACK')
-            halt_with_error 500, 'failed to request to shipment service'
-          end
-
           item_detail['transaction_evidence_id'] = transaction_evidence['id']
           item_detail['transaction_evidence_status'] = transaction_evidence['status']
-          item_detail['shipping_status'] = ssr['status']
+          item_detail['shipping_status'] = statuses[shipping['reserve_id']]['status']
         end
 
         item_detail
@@ -414,8 +443,10 @@ module Isucari
         db.xquery("SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?, ?, ?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", user_simple['id'], ITEM_STATUS_ON_SALE, ITEM_STATUS_TRADING, ITEM_STATUS_SOLD_OUT)
       end
 
+      sellers = batch_get_users(items.map {|i| i['seller_id'] })
+
       item_simples = items.map do |item|
-        seller = get_user_simple_by_id(item['seller_id'])
+        seller = sellers[item['seller_id']]
         halt_with_error 404, 'seller not found' if seller.nil?
 
         category = get_category_by_id(item['category_id'])
