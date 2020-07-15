@@ -3,9 +3,9 @@ require 'json'
 
 module Mysql2QueryLogger
   class Logger
-    def initialize(file:, root_dir:, ignore_fast_query:)
+    def initialize(file:, root_dir:, logging_threshold_ms:)
       @root_dir = root_dir
-      @ignore_fast_query = ignore_fast_query
+      @logging_threshold_ms = logging_threshold_ms
       @logger = ::Logger.new(file)
       @logger.formatter = proc { |severity, datetime, progname, message|
         message + "\n"
@@ -13,7 +13,7 @@ module Mysql2QueryLogger
     end
 
     def log(duration, sql, callers)
-      if type(duration) == :fast && @ignore_fast_query
+      if duration * 1000 < @logging_threshold_ms
         return
       end
       message = "#{process_duration(duration)} #{sql} #{process_caller(callers)}"
@@ -70,10 +70,10 @@ module Mysql2QueryLogger
     end
   end
 
-  def self.enable!(file: STDOUT, root_dir: nil, ignore_fast_query: false)
+  def self.enable!(file: STDOUT, root_dir: nil, logging_threshold_ms: 0)
     Mysql2::Client.prepend(Mysql2QueryLogger::ClientMethods)
     Mysql2::Statement.prepend(Mysql2QueryLogger::StatementMethods)
-    @logger = Mysql2QueryLogger::Logger.new(file: file, root_dir: root_dir, ignore_fast_query: ignore_fast_query)
+    @logger = Mysql2QueryLogger::Logger.new(file: file, root_dir: root_dir, logging_threshold_ms: logging_threshold_ms)
   end
 
   def self.execute(sql)

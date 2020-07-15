@@ -12,7 +12,7 @@ require 'isucari/api'
 require_relative './category'
 require_relative './mysql2_query_logger'
 
-Mysql2QueryLogger.enable!(root_dir: __dir__, ignore_fast_query: ENV['ql'] == '2') if ENV['ql']
+Mysql2QueryLogger.enable!(root_dir: __dir__, logging_threshold_ms: ENV['ql'].to_i) if ENV['ql']
 
 module Isucari
   class Web < Sinatra::Base
