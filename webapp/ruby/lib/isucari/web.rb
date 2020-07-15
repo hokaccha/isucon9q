@@ -200,6 +200,8 @@ module Isucari
         'language' => 'ruby',
       }
 
+      redis.flushall
+
       response.to_json
     end
 
@@ -367,16 +369,22 @@ module Isucari
       end
 
       shippings = {}
+      statuses = {} # => reserve_id => status
+      fetch_target_reserve_ids = []
       if transaction_evidences.size > 0
         db.xquery('SELECT * FROM `shippings` WHERE `transaction_evidence_id` in (?)', transaction_evidences.values.map{_1['id']}).each do |s|
+          if s['status']
+            statuses[s['reserve_id']] = s['status']
+          else
+            fetch_target_reserve_ids << s['reserve_id']
+          end
           shippings[s['transaction_evidence_id']] = s
         end
       end
 
-      statuses = {}
-      if shippings.size > 0
-        reserve_ids = shippings.values.map{_1['reserve_id']}
-        statuses = api_client.shipment_status_parallel(get_shipment_service_url, reserve_ids)
+      if fetch_target_reserve_ids.size > 0
+        results = api_client.shipment_status_parallel(get_shipment_service_url, fetch_target_reserve_ids)
+        statuses.merge!(results)
       end
 
       item_details = items.map do |item|
@@ -432,7 +440,7 @@ module Isucari
 
           item_detail['transaction_evidence_id'] = transaction_evidence['id']
           item_detail['transaction_evidence_status'] = transaction_evidence['status']
-          item_detail['shipping_status'] = statuses[shipping['reserve_id']]['status']
+          item_detail['shipping_status'] = statuses[shipping['reserve_id']]
         end
 
         item_detail
