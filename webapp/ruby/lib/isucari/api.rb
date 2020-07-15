@@ -92,30 +92,64 @@ module Isucari
       JSON.parse(res.body)
     end
 
+    def make_request(uri, method, body)
+      req = Typhoeus::Request.new(uri, {
+        method: method,
+        headers: {
+          'Content-Type' => 'application/json',
+          'User-Agent' => @user_agent,
+          'Authorization' => ISUCARI_API_TOKEN
+        },
+        body: body.to_json,
+      })
+    end
+
     def shipment_status_parallel(shipment_url, reserve_ids)
+      return {} if reserve_ids.empty?
       uri = URI.parse("#{shipment_url}/status")
       hydra = Typhoeus::Hydra.hydra
       results = {}
       reserve_ids.each do |rid|
-        req = Typhoeus::Request.new(uri, {
-          method: :post,
-          headers: {
-            'Content-Type' => 'application/json',
-            'User-Agent' => @user_agent,
-            'Authorization' => ISUCARI_API_TOKEN
-          },
-          body: { reserve_id: rid }.to_json,
-        })
+        req = make_request(uri, :post, { reserve_id: rid })
         req.on_complete do |res|
           if res.code != 200
             raise Error, "status code #{res.code}; body #{res.body}"
           end
-          results[rid] = JSON.parse(res.body)
+          results[rid] = JSON.parse(res.body)['status']
         end
         hydra.queue(req)
       end
       hydra.run
       results
+    end
+
+    def buy(shipment_url:, shipment_body:, payment_url:, payment_body:)
+      scr = nil
+      pstr = nil
+
+      hydra = Typhoeus::Hydra.hydra
+
+      req1 = make_request("#{shipment_url}/create", :post, shipment_body)
+      req1.on_complete do |res|
+        if res.code != 200
+          raise Error, "status code #{res.code}; body #{res.body}"
+        end
+        scr = JSON.parse(res.body)
+      end
+      hydra.queue(req1)
+
+      req2 = make_request("#{payment_url}/token", :post, payment_body)
+      req2.on_complete do |res|
+        if res.code != 200
+          raise Error, "status code #{res.code}; body #{res.body}"
+        end
+        pstr = JSON.parse(res.body)
+      end
+      hydra.queue(req2)
+
+      hydra.run
+
+      [scr, pstr]
     end
   end
 end

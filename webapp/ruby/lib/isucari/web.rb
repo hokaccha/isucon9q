@@ -690,17 +690,16 @@ module Isucari
       end
 
       begin
-        scr = api_client.shipment_create(get_shipment_service_url, to_address: buyer['address'], to_name: buyer['account_name'], from_address: seller['address'], from_name: seller['account_name'])
-      rescue
+        scr, pstr = api_client.buy(
+         shipment_url:  get_shipment_service_url,
+         shipment_body: { to_address: buyer['address'], to_name: buyer['account_name'], from_address: seller['address'], from_name: seller['account_name'] },
+         payment_url: get_payment_service_url,
+         payment_body: { shop_id: PAYMENT_SERVICE_ISUCARI_SHOPID, token: token, api_key: PAYMENT_SERVICE_ISUCARI_APIKEY, price: target_item['price'] },
+        )
+      rescue => err
+        p err
         db.query('ROLLBACK')
-        halt_with_error 500, 'failed to request to shipment service'
-      end
-
-      begin
-        pstr = api_client.payment_token(get_payment_service_url, shop_id: PAYMENT_SERVICE_ISUCARI_SHOPID, token: token, api_key: PAYMENT_SERVICE_ISUCARI_APIKEY, price: target_item['price'])
-      rescue
-        db.query('ROLLBACK')
-        halt_with_error 500, 'payment service is failed'
+        halt_with_error 500, 'failed to request to shipment or payment service'
       end
 
       if pstr['status'] == 'invalid'
