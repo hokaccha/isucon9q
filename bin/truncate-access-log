@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -ex
+
+sudo truncate /var/log/nginx/access.log --size 0
