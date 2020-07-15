@@ -21,11 +21,10 @@ resource "aws_instance" "isucon" {
   instance_type = "t3.medium"
   key_name      = "isucon"
 
-
   vpc_security_group_ids = [aws_security_group.default.id]
 
   root_block_device {
-    volume_size           = 8
+    volume_size           = 20
     volume_type           = "gp2"
     iops                  = 100
     delete_on_termination = true
