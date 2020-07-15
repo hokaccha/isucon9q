@@ -1,4 +1,4 @@
-require 'newrelic_rpm' if ENV['nr'] == '1'
+# require 'newrelic_rpm'
 require 'json'
 require 'pry'
 require 'securerandom'
@@ -6,6 +6,8 @@ require 'sinatra/base'
 require 'mysql2'
 require 'mysql2-cs-bind'
 require 'bcrypt'
+require 'redis'
+require 'hiredis'
 require 'isucari/api'
 require_relative './category'
 require_relative './mysql2_query_logger'
@@ -72,6 +74,13 @@ module Isucari
         )
       end
 
+      def redis
+        Thread.current[:redis] ||= Redis.new(
+          host: 'isucon9-2',
+          driver: :hiredis
+        )
+      end
+
       def api_client
         Thread.current[:api_client] ||= ::Isucari::API.new
       end
@@ -81,13 +90,25 @@ module Isucari
 
         return unless user_id
 
-        db.xquery('SELECT * FROM `users` WHERE `id` = ?', user_id).first
+        key = "users:#{user_id}"
+        cache = redis.get("users:#{user_id}")
+        return JSON.parse(cache) if cache
+
+        user = db.xquery('SELECT * FROM `users` WHERE `id` = ?', user_id).first
+        return unless user
+
+        redis.set(key, user.to_json)
+        user
+      end
+
+      def clear_user_cache(id = nil)
+        return unless id
+        redis.del("users:#{id}")
       end
 
       def get_user_simple_by_id(user_id)
-        user = db.xquery('SELECT id, account_name, num_sell_items FROM `users` WHERE `id` = ?', user_id).first
-
-        return if user.nil?
+        user = get_user(user_id)
+        return unless user
 
         {
           'id' => user['id'],
@@ -774,6 +795,7 @@ module Isucari
       now = Time.now
       begin
         db.xquery('UPDATE `users` SET `num_sell_items` = ?, `last_bump` = ? WHERE `id` = ?', seller['num_sell_items'] + 1, now, seller['id'])
+        clear_user_cache(seller['id'])
       rescue
         db.query('ROLLBACK')
         halt_with_error 500, 'db error'
@@ -1161,6 +1183,7 @@ module Isucari
 
       begin
         db.xquery('UPDATE `users` SET `last_bump` = ? WHERE id = ?', now, seller['id'])
+        clear_user_cache(seller['id'])
       rescue
         db.query('ROLLBACK')
         halt_with_error 500, 'db error'
