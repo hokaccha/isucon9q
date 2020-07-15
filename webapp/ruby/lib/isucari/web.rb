@@ -75,8 +75,8 @@ module Isucari
         Thread.current[:api_client] ||= ::Isucari::API.new
       end
 
-      def get_user
-        user_id = session['user_id']
+      def get_user(id = nil)
+        user_id = id || session['user_id']
 
         return unless user_id
 
@@ -84,7 +84,7 @@ module Isucari
       end
 
       def get_user_simple_by_id(user_id)
-        user = db.xquery('SELECT * FROM `users` WHERE `id` = ?', user_id).first
+        user = db.xquery('SELECT id, account_name, num_sell_items FROM `users` WHERE `id` = ?', user_id).first
 
         return if user.nil?
 
@@ -299,25 +299,34 @@ module Isucari
       db.query('BEGIN')
       items = if item_id > 0 && created_at > 0
         # paging
+        ca = Time.at(created_at)
         begin
-          db.xquery("SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?, ?, ?, ?, ?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT #{TRANSACTIONS_PER_PAGE + 1}", user['id'], user['id'], ITEM_STATUS_ON_SALE, ITEM_STATUS_TRADING, ITEM_STATUS_SOLD_OUT, ITEM_STATUS_CANCEL, ITEM_STATUS_STOP, Time.at(created_at), Time.at(created_at), item_id)
-        rescue
+          db.xquery(<<~SQL, user['id'], ca, ca, item_id, user['id'], ca, ca, item_id)
+            SELECT *
+            FROM (
+              SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN ('on_sale', 'trading', 'sold_out', 'cancel', 'stop') AND (`created_at` < ? OR (`created_at` <= ? AND `id` < ?))
+              union all
+              SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN ('on_sale', 'trading', 'sold_out', 'cancel', 'stop') AND (`created_at` < ? OR (`created_at` <= ? AND `id` < ?))
+            ) as t
+            ORDER BY `created_at` DESC, `id` DESC LIMIT 11
+          SQL
+        rescue => err
+          p err
           db.query('ROLLBACK')
           halt_with_error 500, 'db error'
         end
       else
         # 1st page
         begin
-          db.xquery("
-            SELECT
-              *
+          db.xquery(<<~SQL, user['id'], user['id'])
+            SELECT *
             FROM (
               SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN ('on_sale', 'trading', 'sold_out', 'cancel', 'stop')
               union all
               SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN ('on_sale', 'trading', 'sold_out', 'cancel', 'stop')
             ) as t
             ORDER BY `created_at` DESC, `id` DESC LIMIT 11
-          ", user['id'], user['id'])
+          SQL
         rescue => err
           p err
           db.query('ROLLBACK')
