@@ -1,5 +1,6 @@
-require 'newrelic_rpm'
+require 'newrelic_rpm' if ENV['nr'] == '1'
 require 'json'
+require 'pry'
 require 'securerandom'
 require 'sinatra/base'
 require 'mysql2'
@@ -9,7 +10,7 @@ require 'isucari/api'
 require_relative './category'
 require_relative './mysql2_query_logger'
 
-Mysql2QueryLogger.enable!(root_dir: __dir__, ignore_fast_query: true) if ENV['ql'] == '1'
+Mysql2QueryLogger.enable!(root_dir: __dir__, ignore_fast_query: ENV['ql'] == '2') if ENV['ql']
 
 module Isucari
   class Web < Sinatra::Base
