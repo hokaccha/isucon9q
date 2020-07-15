@@ -212,10 +212,10 @@ module Isucari
 
       items = if item_id > 0 && created_at > 0
         # paging
-        db.xquery("SELECT * FROM `items` WHERE `status` IN (?, ?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", ITEM_STATUS_ON_SALE, ITEM_STATUS_SOLD_OUT, Time.at(created_at), Time.at(created_at), item_id)
+        db.xquery("SELECT * FROM `items` WHERE `can_display_list` = 1 AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", Time.at(created_at), Time.at(created_at), item_id)
       else
         # 1st page
-        db.xquery("SELECT * FROM `items` WHERE `status` IN (?, ?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", ITEM_STATUS_ON_SALE, ITEM_STATUS_SOLD_OUT)
+        db.xquery("SELECT * FROM `items` WHERE `can_display_list` = 1 ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}")
       end
 
       sellers = batch_get_users(items.map {|i| i['seller_id'] })
@@ -263,15 +263,35 @@ module Isucari
       root_category = get_category_by_id(root_category_id)
       halt_with_error 404, 'category not found' if root_category.nil?
 
-      category_ids = db.xquery('SELECT id FROM `categories` WHERE parent_id = ?', root_category['id']).map { |row| row['id'] }
-
       item_id = params['item_id'].to_i
       created_at = params['created_at'].to_i
 
       items = if item_id > 0 && created_at > 0
-        db.xquery("SELECT * FROM `items` WHERE `status` IN (?, ?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", ITEM_STATUS_ON_SALE, ITEM_STATUS_SOLD_OUT, category_ids, Time.at(created_at), Time.at(created_at), item_id)
+        at = Time.at(created_at)
+        db.xquery(<<~SQL, root_category_id, at, at, item_id)
+          SELECT *
+          FROM `items`
+          WHERE
+            can_display_list = 1
+            AND root_category_id = ?
+            AND (`created_at` < ? OR (`created_at` <= ? AND `id` < ?))
+          ORDER BY
+            `created_at` DESC,
+            `id` DESC
+          LIMIT #{ITEMS_PER_PAGE + 1}
+        SQL
       else
-        db.xquery("SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) ORDER BY `created_at` DESC, `id` DESC LIMIT #{ITEMS_PER_PAGE + 1}", ITEM_STATUS_ON_SALE, ITEM_STATUS_SOLD_OUT, category_ids)
+        db.xquery(<<~SQL, root_category_id)
+          SELECT *
+          FROM `items`
+          WHERE
+            can_display_list = 1
+            AND root_category_id = ?
+          ORDER BY
+            `created_at` DESC,
+            `id` DESC
+          LIMIT #{ITEMS_PER_PAGE + 1}
+        SQL
       end
 
       sellers = batch_get_users(items.map {|i| i['seller_id'] })
@@ -691,7 +711,7 @@ module Isucari
       transaction_evidence_id = db.last_id
 
       begin
-        db.xquery('UPDATE `items` SET `buyer_id` = ?, `status` = ?, `updated_at` = ? WHERE `id` = ?', buyer['id'], ITEM_STATUS_TRADING, Time.now, target_item['id'])
+        db.xquery('UPDATE `items` SET `buyer_id` = ?, `can_display_list` = 0, `status` = ?, `updated_at` = ? WHERE `id` = ?', buyer['id'], ITEM_STATUS_TRADING, Time.now, target_item['id'])
       rescue
         db.query('ROLLBACK')
         halt_with_error 500, 'db error'
@@ -791,8 +811,9 @@ module Isucari
       end
 
       begin
-        db.xquery('INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`) VALUES (?, ?, ?, ?, ?, ?, ?)', seller['id'], ITEM_STATUS_ON_SALE, name, price, description, img_name, category['id'])
-      rescue
+        db.xquery('INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`,`root_category_id`,`can_display_list`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', seller['id'], ITEM_STATUS_ON_SALE, name, price, description, img_name, category['id'], category['parent_id'], 1)
+      rescue => err
+        p err
         db.query('ROLLBACK')
         halt_with_error 500, 'db error'
       end
@@ -1092,7 +1113,7 @@ module Isucari
       end
 
       begin
-        db.xquery('UPDATE `items` SET `status` = ?, `updated_at` = ? WHERE `id` = ?', ITEM_STATUS_SOLD_OUT, Time.now, item_id)
+        db.xquery('UPDATE `items` SET `status` = ?, `can_display_list` = 1, `updated_at` = ? WHERE `id` = ?', ITEM_STATUS_SOLD_OUT, Time.now, item_id)
       rescue
         db.query('ROLLBACK')
         halt_with_error 500, 'db error'

@@ -28,6 +28,8 @@ CREATE TABLE `items` (
   `description` text NOT NULL,
   `image_name` varchar(191) NOT NULL,
   `category_id` int unsigned NOT NULL,
+  `root_category_id` int unsigned,
+  `can_display_list` int unsigned NOT NULL default 0,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_category_id (`category_id`)
