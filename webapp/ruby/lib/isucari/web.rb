@@ -339,7 +339,6 @@ module Isucari
       item_id = params['item_id'].to_i
       created_at = params['created_at'].to_i
 
-      db.query('BEGIN')
       items = if item_id > 0 && created_at > 0
         # paging
         ca = Time.at(created_at)
@@ -372,7 +371,6 @@ module Isucari
           SQL
         rescue => err
           p err
-          db.query('ROLLBACK')
           halt_with_error 500, 'db error'
         end
       end
@@ -409,13 +407,11 @@ module Isucari
       item_details = items.map do |item|
         seller = sellers[item['seller_id']]
         if seller.nil?
-          db.query('ROLLBACK')
           halt_with_error 404, 'seller not found'
         end
 
         category = get_category_by_id(item['category_id'])
         if category.nil?
-          db.query('ROLLBACK')
           halt_with_error 404, 'category not found'
         end
 
@@ -453,7 +449,6 @@ module Isucari
         unless transaction_evidence.nil?
           shipping = shippings[transaction_evidence['id']]
           if shipping.nil?
-            db.query('ROLLBACK')
             halt_with_error 404, 'shipping not found'
           end
 
@@ -464,8 +459,6 @@ module Isucari
 
         item_detail
       end
-
-      db.query('COMMIT')
 
       has_next = false
       if item_details.length > TRANSACTIONS_PER_PAGE
