@@ -61,7 +61,7 @@ module Isucari
     helpers do
       def db
         Thread.current[:db] ||= Mysql2::Client.new(
-          'host' => ENV['MYSQL_HOST'] || 'isucon9-1',
+          'host' => ENV['MYSQL_HOST'] || 'isucon9-3',
           'port' => ENV['MYSQL_PORT'] || '3306',
           'database' => ENV['MYSQL_DBNAME'] || 'isucari',
           'username' => ENV['MYSQL_USER'] || 'isucari',
