@@ -1,0 +1,6 @@
+#!/bin/sh
+
+set -ex
+
+cd $(dirname "$0")/../webapp/ruby
+bundle exec stackprof --d3-flamegraph tmp/* > ../public/flamegraph.html

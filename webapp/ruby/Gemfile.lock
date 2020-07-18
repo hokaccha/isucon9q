@@ -1,4 +1,10 @@
 GIT
+  remote: https://github.com/osyoyu/stackprof
+  revision: 605f56165bb2ebcc425fca386587d5fe8a174911
+  specs:
+    stackprof (0.2.12)
+
+GIT
   remote: https://github.com/sinatra/sinatra
   revision: 49fc62e8216c6811e4b6cfbeddd47b80edb10960
   specs:
@@ -71,6 +77,7 @@ DEPENDENCIES
   redis
   sinatra!
   sinatra-contrib
+  stackprof!
   typhoeus
 
 BUNDLED WITH

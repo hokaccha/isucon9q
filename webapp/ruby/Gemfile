@@ -11,6 +11,7 @@ gem 'pry'
 gem 'typhoeus'
 gem 'redis'
 gem 'hiredis'
+gem 'stackprof', git: 'https://github.com/osyoyu/stackprof'
 
 group :development do
   gem 'sinatra-contrib'
