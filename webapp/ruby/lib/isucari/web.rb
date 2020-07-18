@@ -194,7 +194,7 @@ module Isucari
 
       response = {
         # キャンペーン実施時には還元率の設定を返す。詳しくはマニュアルを参照のこと。
-        'campaign' => 2,
+        'campaign' => ENV['cp']&.to_i ,
         # 実装言語を返す
         'language' => 'ruby',
       }
