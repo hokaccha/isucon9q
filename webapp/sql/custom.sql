@@ -20,3 +20,4 @@ create index item1 on items (seller_id, status, created_at);
 create index item2 on items (buyer_id, status, created_at);
 create index item3 on items (can_display_list, root_category_id, created_at);
 create index item4 on items (can_display_list, created_at);
+create index user1 on users (account_name);
