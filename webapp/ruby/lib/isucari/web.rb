@@ -22,7 +22,6 @@ module Isucari
     ITEM_MIN_PRICE = 100
     ITEM_MAX_PRICE = 1000000
     ITEM_PRICE_ERR_MSG = '商品価格は100ｲｽｺｲﾝ以上、1,000,000ｲｽｺｲﾝ以下にしてください'
-
     ITEM_STATUS_ON_SALE = 'on_sale'
     ITEM_STATUS_TRADING = 'trading'
     ITEM_STATUS_SOLD_OUT = 'sold_out'
@@ -648,6 +647,14 @@ module Isucari
       response.to_json
     end
 
+    def get_item_lock(id)
+      redis.setnx("itemlock:#{id}", 1)
+    end
+
+    def del_item_lock(id)
+      redis.del("itemlock:#{id}")
+    end
+
     # postBuy
     post '/buy' do
       csrf_token = body_params['csrf_token']
@@ -659,62 +666,48 @@ module Isucari
       buyer = get_user
       halt_with_error 404, 'buyer not found' if buyer.nil?
 
-      db.query('BEGIN')
+      unless get_item_lock(item_id)
+        halt_with_error 403, 'item is not for sale'
+      end
 
       begin
-        target_item = db.xquery('SELECT * FROM `items` WHERE `id` = ? FOR UPDATE', item_id).first
+        target_item = db.xquery('SELECT * FROM `items` WHERE `id` = ?', item_id).first
 
         if target_item.nil?
-          db.query('ROLLBACK')
+          del_item_lock(item_id)
           halt_with_error 404, 'item not found'
         end
       rescue
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 500, 'db error'
       end
 
       if target_item['status'] != ITEM_STATUS_ON_SALE
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 403, 'item is not for sale'
       end
 
       if target_item['seller_id'] == buyer['id']
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 403, '自分の商品は買えません'
       end
 
       begin
-        seller = db.xquery('SELECT * FROM `users` WHERE `id` = ? FOR UPDATE', target_item['seller_id']).first
+        seller = get_user(target_item['seller_id'])
 
         if seller.nil?
-          db.query('ROLLBACK')
+          del_item_lock(item_id)
           halt_with_error 404, 'seller not found'
         end
       rescue
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 500, 'db error'
       end
 
       category = get_category_by_id(target_item['category_id'])
       if category.nil?
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 500, 'category id error'
-      end
-
-      begin
-        db.xquery('INSERT INTO `transaction_evidences` (`seller_id`, `buyer_id`, `status`, `item_id`, `item_name`, `item_price`, `item_description`,`item_category_id`,`item_root_category_id`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', target_item['seller_id'], buyer['id'], TRANSACTION_EVIDENCE_STATUS_WAIT_SHIPPING, target_item['id'], target_item['name'], target_item['price'], target_item['description'], category['id'], category['parent_id'])
-      rescue
-        db.query('ROLLBACK')
-        halt_with_error 500, 'db error'
-      end
-
-      transaction_evidence_id = db.last_id
-
-      begin
-        db.xquery('UPDATE `items` SET `buyer_id` = ?, `can_display_list` = 0, `status` = ?, `updated_at` = ? WHERE `id` = ?', buyer['id'], ITEM_STATUS_TRADING, Time.now, target_item['id'])
-      rescue
-        db.query('ROLLBACK')
-        halt_with_error 500, 'db error'
       end
 
       begin
@@ -726,33 +719,49 @@ module Isucari
         )
       rescue => err
         p err
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 500, 'failed to request to shipment or payment service'
       end
 
       if pstr['status'] == 'invalid'
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 400, 'カード情報に誤りがあります'
       end
 
       if pstr['status'] == 'fail'
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 400, 'カードの残高が足りません'
       end
 
       if pstr['status'] != 'ok'
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 400, '想定外のエラー'
+      end
+
+      begin
+        db.xquery('INSERT INTO `transaction_evidences` (`seller_id`, `buyer_id`, `status`, `item_id`, `item_name`, `item_price`, `item_description`,`item_category_id`,`item_root_category_id`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', target_item['seller_id'], buyer['id'], TRANSACTION_EVIDENCE_STATUS_WAIT_SHIPPING, target_item['id'], target_item['name'], target_item['price'], target_item['description'], category['id'], category['parent_id'])
+      rescue
+        del_item_lock(item_id)
+        halt_with_error 500, 'db error'
+      end
+
+      transaction_evidence_id = db.last_id
+
+      begin
+        db.xquery('UPDATE `items` SET `buyer_id` = ?, `can_display_list` = 0, `status` = ?, `updated_at` = ? WHERE `id` = ?', buyer['id'], ITEM_STATUS_TRADING, Time.now, target_item['id'])
+      rescue
+        del_item_lock(item_id)
+        halt_with_error 500, 'db error'
       end
 
       begin
         db.xquery('INSERT INTO `shippings` (`transaction_evidence_id`, `status`, `item_name`, `item_id`, `reserve_id`, `reserve_time`, `to_address`, `to_name`, `from_address`, `from_name`, `img_binary`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', transaction_evidence_id, SHIPPINGS_STATUS_INITIAL, target_item['name'], target_item['id'], scr['reserve_id'], scr['reserve_time'], buyer['address'], buyer['account_name'], seller['address'], seller['account_name'], '')
       rescue
-        db.query('ROLLBACK')
+        del_item_lock(item_id)
         halt_with_error 500, 'db error'
       end
 
-      db.query('COMMIT')
+      del_item_lock(item_id)
 
       { 'transaction_evidence_id' => transaction_evidence_id }.to_json
     end
