@@ -4,7 +4,7 @@ require 'hiredis'
 require 'json'
 
 redis = Redis.new(
-  host: 'isucon9-2',
+  host: 'isucon9-1',
   driver: :hiredis
 )
 

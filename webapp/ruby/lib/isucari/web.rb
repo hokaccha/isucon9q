@@ -75,7 +75,7 @@ module Isucari
 
       def redis
         Thread.current[:redis] ||= Redis.new(
-          host: 'isucon9-2',
+          host: 'isucon9-1',
           driver: :hiredis
         )
       end
@@ -199,7 +199,7 @@ module Isucari
         'language' => 'ruby',
       }
 
-      redis.flushall
+      # redis.flushall
 
       response.to_json
     end

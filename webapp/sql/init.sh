@@ -2,6 +2,10 @@
 set -xe
 set -o pipefail
 
+sudo systemctl stop redis
+sudo cp /tmp/dump.rdb /var/lib/redis/dump.rdb
+sudo systemctl start redis
+
 CURRENT_DIR=$(cd $(dirname $0);pwd)
 export MYSQL_HOST=${MYSQL_HOST:-isucon9-3}
 export MYSQL_PORT=${MYSQL_PORT:-3306}
