@@ -5,14 +5,14 @@ require 'securerandom'
 require 'sinatra/base'
 require 'mysql2'
 require 'mysql2-cs-bind'
+require 'mysql2-query-logger'
 require 'bcrypt'
 require 'redis'
 require 'hiredis'
 require 'isucari/api'
 require_relative './category'
-require_relative './mysql2_query_logger'
 
-Mysql2QueryLogger.enable!(root_dir: __dir__, logging_threshold_ms: ENV['ql'].to_i) if ENV['ql']
+Mysql2QueryLogger.enable(root_dir: __dir__, threshold_time: ENV['ql'].to_i) if ENV['ql']
 
 module Isucari
   class Web < Sinatra::Base

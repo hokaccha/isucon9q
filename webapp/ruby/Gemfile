@@ -12,6 +12,7 @@ gem 'typhoeus'
 gem 'redis'
 gem 'hiredis'
 gem 'stackprof', git: 'https://github.com/osyoyu/stackprof'
+gem 'mysql2-query-logger', git: 'https://github.com/hokaccha/mysql2-query-logger'
 
 group :development do
   gem 'sinatra-contrib'

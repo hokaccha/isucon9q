@@ -1,4 +1,10 @@
 GIT
+  remote: https://github.com/hokaccha/mysql2-query-logger
+  revision: ec10043d0b0d1726749113b6e3f04eb96eaf6ac8
+  specs:
+    mysql2-query-logger (1.0.0)
+
+GIT
   remote: https://github.com/osyoyu/stackprof
   revision: 605f56165bb2ebcc425fca386587d5fe8a174911
   specs:
@@ -71,6 +77,7 @@ DEPENDENCIES
   hiredis
   mysql2
   mysql2-cs-bind
+  mysql2-query-logger!
   pry
   puma
   rack-lineprof
